@@ -14,6 +14,7 @@ import (
 	"strconv"
 )
 
+//Takes a filename and an image and saves it to a file as a PNG (syncronhously)
 func SaveImage(name string, img image.Image) {
 	fo, err := os.Create(name)
 	if err != nil {
@@ -25,6 +26,10 @@ func SaveImage(name string, img image.Image) {
 	defer fo.Close()
 }
 
+//Takes a list of words (i.e. from a book), finds words that match the search term,
+//and creates an image based on the usage of those words with each pixel representing
+//the specified number of words (sectionSize). The channel will be sent a value of 1
+//upon the successful completion of the task
 func CreateImage(words []string, searchTerm string, sectionSize int, quit chan int) {
 	searchTerms := strings.Fields(searchTerm)
 	
@@ -69,11 +74,15 @@ func CreateImage(words []string, searchTerm string, sectionSize int, quit chan i
 	quit <- 1
 }
 
+//Removes any non alphanumeric (and dash + space) characters from a string
 func RemovePunctuation(original string) string {
 	regex, _ := regexp.Compile("[^a-zA-Z0-9 -]")
 	return regex.ReplaceAllString(original, "")
 }
 
+//Takes a filename of a book (text file) that has been analysed along
+//with a list of characters and outputs an HTML file with a list of those
+//characters along with the images of the appropriate appearances
 func CreateHTML(filename string, characters []string) {
 	bookName := strings.Replace(filename, ".txt", "", -1)
 	htmlDocumentName := bookName + ".html"
@@ -89,13 +98,31 @@ func CreateHTML(filename string, characters []string) {
 	ioutil.WriteFile(htmlDocumentName, []byte(html), 0777)
 }
 
+//This is the main function. It accepts a minimum of three command line arguments.
+//The first argument should be the filename of the text file that you wish to analyse
+//The second argument should be the number of words that each pixel should represent in
+//the final image. A good number for a short book (like the first Harry Potter) might be 150 - 250
+//however for a longer novel (like the fifth Harry Potter) 500 - 1000 may be more appropriate.
+//If you give a value of 0 or less it will automatically use the total number of words, which could
+//generate a VERY LARGE image. The default height for the output images is 20 pixels, you can change
+//this in the CreateImage function.
+//The following arguments should be the names of characters that you wish to find in the book.
+//Remember that if you want to find a character that is referred to by the forename and surname
+//you can format your command line arguments as "firstname surname". Any word that matches either of
+//the names will be deemed as referring to the character. For example, if analysing Harry Potter it
+//may be better to refer to the titular character as 'harry' rather than 'harry potter' because the
+//search will find all references to his parents and children as well (whilst there are no other
+//characters in the books called harry).
+//And remember, you don't have to just stick to character's names!
 func main() {
 	args := os.Args;
 	//The first argument is the executable name
 	if len(args) > 3 {
 		filename := args[1]
-		sectionSize, intParseErr := strconv.ParseInt(args[2], 10, 32)
+		//Parse the <sectionsize> argument as an int64 in base 10
+		sectionSize, intParseErr := strconv.ParseInt(args[2], 10, 64)
 		
+		//Set the default to a value of 100 if parsing fails
 		if intParseErr != nil {
 			fmt.Println(intParseErr)
 			sectionSize = 100
@@ -116,6 +143,11 @@ func main() {
 		//The Fields function splits on whitespace and removes all whitespace :)
 		words := strings.Fields(contents)
 		fmt.Println("There are", len(words), "words")
+		
+		//
+		if sectionSize <= 0 {
+			sectionSize = len(words)
+		}
 		
 		channels := make([]chan int, len(args))
 		
